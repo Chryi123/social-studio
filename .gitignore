@@ -1,13 +1,21 @@
+# Local credentials, sessions, OAuth tokens and generated state
 reddit_config.json
 social_published.json
 .env
 .env.*
 !.env.example
+*.log
 __pycache__/
 *.pyc
-*.log
-*.tmp
 .venv/
 venv/
 .idea/
 .vscode/
+# Video exports and extracted gameplay media (add only intentionally)
+*.mp4
+*.mov
+*.webm
+*.avi
+*.mkv
+exports/
+frames/

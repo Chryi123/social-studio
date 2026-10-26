@@ -1,11 +1,12 @@
 /* Social Studio v1 — local Ollama + manual posting/measurement.
-   Never automatically publishes, fetches Reddit data, or invents rules. */
+   Videos processed locally; publish only with approved OAuth review. */
 (() => {
 'use strict';
 const $ = id => document.getElementById(id);
 const q = s => String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const storageKey='social_studio_1_settings',reportKey='social_studio_1_report',metricKey='social_studio_1_metrics';
 let report=null, chosen=0, currentLanguage='en', busy=false;
+let chosenVideoFrames=[], videoFrameList=[];
 const langNames={en:'English',it:'Italiano',fr:'Français',de:'Deutsch',es:'Español','pt-BR':'Português (BR)',pl:'Polski',ja:'日本語',ko:'한국어','zh-CN':'简体中文',tr:'Türkçe',ru:'Русский'};
 const fields=['game','platform','goal','community','rules','last-post','gap','angle','extra','samples','custom-name','custom-premise','custom-loop','custom-hook','custom-available','custom-planned'];
 function safeRead(key, fallback) {try{return JSON.parse(localStorage.getItem(key)||'null')??fallback}catch(e){return fallback}}
@@ -52,7 +53,7 @@ async function check(){let e=$('status');e.textContent='Controllo Ollama…';try
  else if(data.connected){e.textContent='Ollama attivo, ma qwen3.5:9b non trovato: esegui ollama list.';e.className='status warn'}
  else{e.textContent=data.error||'Ollama spento.';e.className='status warn'}
 }catch(err){e.textContent='Server locale non disponibile: avvia AVVIA_SOCIAL_STUDIO.bat';e.className='status warn'}}
-async function imagesBase64(){const files=[...$('images').files];if(files.length>2)throw new Error('Carica al massimo 2 immagini.');const output=[];for(const file of files){
+async function imagesBase64(){const files=[...$('images').files];if(files.length>4)throw new Error('Carica al massimo 4 immagini.');const output=[];for(const file of files){
  if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw new Error('Carica solo JPG, PNG o WebP.');
  const dataUrl=await new Promise((resolve,reject)=>{const f=new FileReader();f.onload=()=>resolve(f.result);f.onerror=()=>reject(new Error('Lettura immagine fallita'));f.readAsDataURL(file)});
  const image=await new Promise((resolve,reject)=>{const x=new Image();x.onload=()=>resolve(x);x.onerror=()=>reject(new Error('Immagine non valida'));x.src=dataUrl});
@@ -64,7 +65,7 @@ async function api(path,data){const r=await fetch(path,{method:'POST',headers:{'
 function setBusy(v,desc){busy=v;$('generate').disabled=v;$('translate').disabled=v||!report;$('generate').textContent=v?'Qwen sta lavorando…':'Genera 3 post e piano';if(desc)$('progress').textContent=desc}
 async function generate(){if(busy)return;$('error').textContent='';const payload=params();if(payload.game==='custom'&&(!payload.custom.premise||!payload.custom.core_loop)){$('error').textContent='Per un gioco nuovo indica almeno Premessa e Core loop.';return;}
  if(payload.platform==='reddit'&&!payload.community){$('error').textContent='Inserisci una community Reddit (es. r/indiegames).';return;}
- try{setBusy(true,'Preparo i riferimenti e le immagini…');payload.images=await imagesBase64();setBusy(true,'Analisi Qwen 9B in locale: tre proposte, scalette video e calendario.');const res=await api('/api/generate',payload);res.translations={};report=res;chosen=0;currentLanguage='en';safeSave(reportKey,res);renderReport();renderWeek();setBusy(false,'Piano pronto. Seleziona il post migliore e, se vuoi, traducilo.');}
+ try{setBusy(true,'Preparo i riferimenti e le immagini…');payload.images=[...chosenVideoFrames.map(f=>f.jpeg.split(',')[1]),...await imagesBase64()];if(payload.images.length>4)throw new Error('Massimo 4 fotogrammi/immagini in totale. Deseleziona un frame o rimuovi immagini manuali.');payload.video_frame_times=chosenVideoFrames.map(f=>f.name+' @ '+f.time.toFixed(1)+'s').join('; ');setBusy(true,'Analisi Qwen 9B in locale: tre proposte, scalette video e calendario.');const res=await api('/api/generate',payload);res.translations={};report=res;chosen=0;currentLanguage='en';safeSave(reportKey,res);renderReport();renderWeek();setBusy(false,'Piano pronto. Seleziona il post migliore e, se vuoi, traducilo.');}
  catch(e){$('error').textContent=e.message;setBusy(false,'Non completato. Controlla Ollama oppure riprova senza immagini.');}
 }
 function selectedPost(){return report?.posts?.[chosen]||null}
@@ -116,12 +117,101 @@ function renderMetrics(){const data=tracks();const total=x=>data.reduce((acc,p)=
  $('track-table').innerHTML=data.length?`<table><thead><tr><th>Data</th><th>Social</th><th>Gioco</th><th>Community</th><th>Viste</th><th>Like</th><th>Commenti</th><th>Click</th><th>Post</th></tr></thead><tbody>${data.slice().reverse().map(p=>`<tr><td>${q(p.date)}</td><td>${q(p.platform)}</td><td>${q(p.game)}</td><td>${q(p.community)}</td><td>${p.views??'—'}</td><td>${p.votes??'—'}</td><td>${p.comments??'—'}</td><td>${p.clicks??'—'}</td><td>${p.url?`<a target="_blank" rel="noopener noreferrer" href="${q(p.url)}">Apri</a>`:'—'}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">Nessun post registrato. Inserisci i primi risultati qui a fianco.</div>';
 }
 function metricsCsv(){const rows=[['date','game','platform','community','url','views','votes','comments','clicks','notes'],...tracks().map(p=>['date','game','platform','community','url','views','votes','comments','clicks','notes'].map(k=>p[k]))];download('social_studio_metriche.csv',csv(rows),'text/csv;charset=utf-8')}
+/* Client-only MP4/WebM frame extraction. Only selected JPEG frames reach Ollama. */
+function videoFrameDownload(frame){const a=document.createElement('a');a.href=frame.jpeg;a.download=frame.name.replace(/[^a-z0-9_-]/gi,'_')+'_'+Math.round(frame.time)+'s.jpg';document.body.appendChild(a);a.click();a.remove();}
+async function loadVideo(file) {
+  const url=URL.createObjectURL(file), vid=document.createElement('video');
+  vid.preload='auto';vid.muted=true;vid.playsInline=true;vid.src=url;
+  try {
+    await new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>reject(new Error('Timeout apertura '+file.name)),16000);
+      vid.onloadedmetadata=()=>{clearTimeout(timer);resolve()};
+      vid.onerror=()=>{clearTimeout(timer);reject(new Error('Formato video non decodificabile: '+file.name))};
+      vid.load();
+    });
+    if(!Number.isFinite(vid.duration)||vid.duration<=0)throw new Error('Durata video non valida: '+file.name);
+    const interval=Number($('video-interval').value)||7;
+    const times=[];
+    for(let t=Math.min(1,vid.duration/2);t<vid.duration-0.25 && times.length<14;t+=interval)times.push(t);
+    if(!times.length)times.push(vid.duration/2);
+    const result=[];
+    for(let i=0;i<times.length;i++){
+      const t=times[i];
+      $('video-state').textContent=`Analizzo ${file.name}: fotogramma ${i+1}/${times.length}`;
+      await new Promise((resolve,reject)=>{
+        const timer=setTimeout(()=>{vid.removeEventListener('seeked',done);reject(new Error('Timeout ricerca fotogramma '+file.name))},12000);
+        function done(){clearTimeout(timer);vid.removeEventListener('seeked',done);resolve()}
+        vid.addEventListener('seeked',done,{once:true});vid.currentTime=t;
+      });
+      const ratio=Math.min(1,960/Math.max(vid.videoWidth,vid.videoHeight));
+      const c=document.createElement('canvas');c.width=Math.max(1,Math.round(vid.videoWidth*ratio));c.height=Math.max(1,Math.round(vid.videoHeight*ratio));
+      const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(vid,0,0,c.width,c.height);
+      const pix=ctx.getImageData(0,0,Math.min(c.width,240),Math.min(c.height,160)),v=pix.data;
+      let avg=0,delta=0;
+      for(let k=0;k<v.length;k+=16){const y=(v[k]+v[k+1]+v[k+2])/3;avg+=y;delta+=Math.abs(y-128)}
+      const divisor=Math.ceil(v.length/16);avg/=divisor;delta/=divisor;
+      result.push({id:file.name+'-'+i,name:file.name,time:t,jpeg:c.toDataURL('image/jpeg',0.73),score:avg>18&&avg<228?delta:0});
+    }
+    return result;
+  }finally{vid.pause();vid.removeAttribute('src');vid.load();URL.revokeObjectURL(url)}
+}
+function renderVideoFrames(){
+  $('video-selected').textContent=`${chosenVideoFrames.length} / 4 fotogrammi selezionati`;
+  $('video-download').disabled=!chosenVideoFrames.length;
+  $('video-use').disabled=!chosenVideoFrames.length;
+  const gallery=$('video-gallery');
+  if(!videoFrameList.length){gallery.innerHTML='<div class="video-empty">Nessun fotogramma estratto.</div>';return}
+  gallery.innerHTML=videoFrameList.map((f,i)=>`<div><button type="button" class="video-frame ${chosenVideoFrames.includes(f)?'chosen':''}" data-vindex="${i}" aria-pressed="${chosenVideoFrames.includes(f)}"><img loading="lazy" src="${f.jpeg}" alt="Fotogramma di ${q(f.name)} al secondo ${f.time.toFixed(1)}"><small>${q(f.name)} · ${f.time.toFixed(1)}s</small><span>${chosenVideoFrames.includes(f)?'✓ Selezionato':'Seleziona per Qwen'}</span></button><button type="button" class="secondary" data-vsave="${i}" style="width:100%;margin-top:5px">Scarica JPG</button></div>`).join('');
+  gallery.querySelectorAll('[data-vindex]').forEach(button=>{
+    button.addEventListener('click',(e)=>{
+      const f=videoFrameList[Number(button.dataset.vindex)];
+      if(chosenVideoFrames.includes(f))chosenVideoFrames=chosenVideoFrames.filter(x=>x!==f);
+      else if(chosenVideoFrames.length>=4){$('video-state').textContent='Sono selezionabili al massimo 4 fotogrammi per Qwen. Deselezionane uno.';return}
+      else chosenVideoFrames.push(f);
+      renderVideoFrames();
+    });
+  });
+  gallery.querySelectorAll('[data-vsave]').forEach(button=>button.addEventListener('click',()=>videoFrameDownload(videoFrameList[Number(button.dataset.vsave)])));
+}
+async function extractVideos(){
+  const files=Array.from($('video-files').files);
+  if(!files.length||files.length>2){$('video-state').textContent='Seleziona 1 o 2 file video.';return}
+  if(files.some(f=>!(/\.(mp4|webm|mov)$/i).test(f.name))){$('video-state').textContent='Carica MP4, WebM o MOV.';return}
+  $('video-extract').disabled=true;videoFrameList=[];chosenVideoFrames=[];renderVideoFrames();
+  try{
+    for(const f of files)videoFrameList.push(...await loadVideo(f));
+    // Select up to 4 candidates spread across clips; all choices remain editable.
+    const perClip=Math.max(1,Math.floor(4/files.length));
+    for(const file of files){
+      const candidates=videoFrameList.filter(f=>f.name===file.name);
+      const picks=candidates.filter(f=>f.score>0).sort((a,b)=>b.score-a.score);
+      for(const f of picks.slice(0,perClip))if(!chosenVideoFrames.includes(f)&&chosenVideoFrames.length<4)chosenVideoFrames.push(f);
+    }
+    $('video-state').textContent=`Estratti ${videoFrameList.length} fotogrammi da ${files.length} video. Selezione iniziale automatica: controllala e correggila prima di generare il post.`;
+    renderVideoFrames();
+  }catch(e){$('video-state').textContent='Errore: '+e.message;renderVideoFrames();}
+  finally{$('video-extract').disabled=false}
+}
+function setupVideos(){
+  $('video-extract').addEventListener('click',extractVideos);
+  $('video-files').addEventListener('change',()=>{videoFrameList=[];chosenVideoFrames=[];renderVideoFrames();$('video-state').textContent='Pronto per estrarre i fotogrammi.'});
+  $('video-download').addEventListener('click',()=>chosenVideoFrames.forEach((frame,i)=>setTimeout(()=>videoFrameDownload(frame),i*180)));
+  $('video-use').addEventListener('click',()=>{
+    $('game').value=$('video-game').value;
+    $('platform').value='reddit';
+    $('angle').value='Spunto da gameplay reale: chiedere quale dettaglio sembra cambiato o fuori posto, senza inventare anomalie non visibili. I fotogrammi sono immagini campionate nel tempo e NON provano da soli le modifiche.';
+    const newNote=chosenVideoFrames.map(f=>`${f.name} ${f.time.toFixed(1)}s`).join('; ');
+    $('extra').value=`Video caricati dallo sviluppatore; frame analizzati: ${newNote}. Non affermare di aver esaminato il video completo. Evita di affermare anomalie specifiche non dimostrate dai frame.`;
+    updateSections();saveSettings();tab('plan');$('video-state').textContent='Fotogrammi applicati al brief. Premi «Genera 3 post e piano» nella scheda Crea contenuti.';
+  });
+}
+
 function init(){loadSettings();for(const name of fields)$(name).addEventListener('change',()=>{saveSettings();updateSections()});document.querySelectorAll('#lang-choice input').forEach(x=>x.addEventListener('change',saveSettings));
  document.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('click',()=>tab(b.dataset.tab)));
  $('check').addEventListener('click',check);$('open-rules').addEventListener('click',linkRules);$('open-community').addEventListener('click',linkCommunity);
  $('generate').addEventListener('click',generate);$('translate').addEventListener('click',translate);$('export-json').addEventListener('click',reportExport);$('export-csv').addEventListener('click',postsCsv);$('week-export').addEventListener('click',weekCsv);
  $('save-posts').addEventListener('click',()=>{if(report){safeSave(reportKey,report);$('progress').textContent='Salvato nel browser (esporta anche il JSON per sicurezza).'}});
- $('track-date').value=new Date().toLocaleDateString('en-CA');$('track-save').addEventListener('click',addTrack);$('track-export').addEventListener('click',metricsCsv);$('track-clear').addEventListener('click',()=>{if(confirm('Cancellare lo storico social di questo browser? Esporta prima il CSV.')){safeSave(metricKey,[]);renderMetrics()}});
+ setupVideos();$('track-date').value=new Date().toLocaleDateString('en-CA');$('track-save').addEventListener('click',addTrack);$('track-export').addEventListener('click',metricsCsv);$('track-clear').addEventListener('click',()=>{if(confirm('Cancellare lo storico social di questo browser? Esporta prima il CSV.')){safeSave(metricKey,[]);renderMetrics()}});
  updateSections();report=safeRead(reportKey,null);if(report&&Array.isArray(report.posts)){report.translations ||= {};renderReport()};renderMetrics();check();}
 init();
 })();

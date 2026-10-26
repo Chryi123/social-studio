@@ -1,141 +1,76 @@
-# Social Studio
+# Social Studio 2.0 — Benchmark Reddit e pubblicazione dopo revisione
 
-**A local desktop tool for indie game community research, content planning, and human-reviewed Reddit publishing.**
+Questa versione conserva le funzioni v1 (post per Liminal, ⱯL∞P e giochi nuovi; Qwen 3.5:9b; varianti; traduzioni; calendario; metriche) e aggiunge **confronto dei post più votati tramite Reddit OAuth e pubblicazione di un singolo post dopo revisione e conferma esplicita**.
 
-Social Studio helps a small indie game development team understand relevant communities, prepare original development updates and gameplay posts, and manage the process of publishing content on Reddit.
+## Requisiti
 
-The application is designed around a **human-in-the-loop workflow**: developers inspect community rules, review and edit drafts, and explicitly authorize **each individual Reddit post** before it is submitted. It does not run unattended posting campaigns.
+- Windows, Python 3 (senza dipendenze pip).
+- Ollama con `qwen3.5:9b`, per la generazione IA; per il confronto e la pubblicazione tramite Reddit non è necessario che Qwen sia acceso.
+- **Accesso alla Reddit Data API già autorizzato** per il vostro utilizzo, inclusa l'eventuale promozione commerciale. Reddit può richiedere approvazione, accordi e corrispettivi. L'esistenza di una app OAuth non è prova di approvazione. Prima di attivare l'integrazione chiedete e ottenete accesso Reddit per il caso d'uso.
+- Una app Reddit di tipo Web/Confidential autorizzata, con `client_id`, `client_secret` e redirect URI **identico** a `http://127.0.0.1:8766/reddit/callback` (se usate una porta diversa, adattate la URI). L’app richiede gli scope `identity read submit`.
 
-> **Project status:** Experimental local application. Access to Reddit's Data API, including any promotional/commercial use, requires the appropriate authorization from Reddit. The existence of OAuth credentials does not, by itself, grant that authorization.
+## Avvio e collegamento
 
-## What it does
+1. Estrai lo ZIP e fai doppio clic su `AVVIA_SOCIAL_STUDIO.bat`.
+2. Apri `http://127.0.0.1:8766/` > **Confronta & Pubblica**.
+3. Dopo aver ottenuto accesso Reddit, inserisci Client ID, Client Secret, User-Agent identificabile e dichiara che Reddit ha autorizzato il caso d'uso. Clicca **Salva configurazione autorizzata**. Non inserire credenziali Reddit username/password.
+4. Clicca **Collega il mio account Reddit** e completa **OAuth nel sito Reddit**. Torna a Social Studio e premi **Verifica collegamento**.
+5. Il tool conserva le credenziali della app **solo** in `reddit_config.json` sulla macchina (file da NON condividere e NON caricare qui). Gli access token sono **soltanto in memoria** e, usando sessioni temporanee, vanno ricollegati quando scadono. Non c'è autopost dopo aver chiuso il PC.
 
-### Community research and comparison
+## Confronto post già riusciti
 
-- Retrieve a limited sample of top public posts from a selected subreddit using an **authorized Reddit OAuth connection**.
-- Compare visible signals such as scores, comment counts, titles, and relevant discussion topics.
-- Retrieve subreddit rules for review; moderators' pinned posts and any additional posting requirements still need to be checked manually.
-- Use selected examples as references for **original content planning**, not for copying existing posts.
+- Inserisci una community specifica, ad esempio `r/IndieGaming`.
+- Seleziona periodo e, facoltativamente, parole chiave.
+- Clicca **Analizza post più votati**: il tool richiede l'elenco top alla Reddit Data API autorizzata. Mostra punteggio, commenti, titolo, estratto, fonte e un'indicazione semplice di pertinenza.
+- Clicca **Aggiungi come riferimento per Qwen** su un post pertinente; tornerà nel campo Esempi della scheda Crea contenuti. Rigenera le varianti: Qwen può confrontare gli hook e la struttura del post senza copiarlo.
+- Clicca **Leggi regole Reddit**: vengono richieste le regole della community via API e riportate nel campo di revisione. Occorre **comunque** leggere i post fissati e i requisiti specifici/moderazione, e non confondere una community adatta al tema con il permesso di autopromozione.
+- Se le API non sono autorizzate, resta disponibile il vecchio flusso senza raccolta automatica: incollare esempi e regole legittimamente ottenuti.
 
-Engagement numbers are descriptive: high scores or comment counts do **not** establish why a post performed well or how many Steam wishlists it generated.
+## Se l’accesso Data API non è stato ancora autorizzato
 
-### Content preparation
+Puoi usare Qwen e la scheda **Crea contenuti** senza Reddit API: incolla nel campo Esempi i post consultati legittimamente. Nella scheda di revisione, **Apri Reddit per pubblicare manualmente** copia titolo e corpo, apre Reddit e lascia a te l'invio. Non aggira le autorizzazioni né pubblica senza consenso.
 
-- Create three alternative post concepts, titles, and draft descriptions for an indie game.
-- Prepare short-video concepts, practical shot lists, and a suggested seven-day content plan.
-- Produce language adaptations and export drafts, plans, and manually recorded metrics as CSV/JSON.
-- Work with the included profiles for **Liminal Backrooms** and **ⱯL∞P**, or enter the details of a different game.
+## Pubblicare **dopo** approvazione
 
-**Optional local AI assistance:** Social Studio can use **Ollama with `qwen3.5:9b`** to help analyze developer-provided context and prepare draft copy. The model runs locally. It does **not** make publishing decisions or submit posts. Developers remain responsible for factual accuracy, editing, compliance with community rules, and any disclosure required by a subreddit. The application does not train or fine-tune models on Reddit data.
+1. Da **Crea contenuti**, genera le tre proposte di Reddit per il gioco desiderato. Puoi anche scrivere da zero la bozza finale.
+2. Vai in **Confronta & Pubblica**, scegli una variante e clicca **Importa bozza selezionata**.
+3. Modifica il **subreddit finale, titolo e corpo esatti** che vuoi pubblicare. Questa versione supporta **post di testo** con eventuali link nel corpo (se la community li consente). Foto, GIF e video vanno ancora caricati manualmente su Reddit.
+4. Leggi le regole, verifica che l'autopromozione sia permessa e che l'eventuale IA usata sia dichiarata se richiesto. Conferma tutte e quattro le checkbox.
+5. Clicca **Prepara anteprima finale**. Il server salva la versione revisionata per 10 minuti, senza pubblicarla.
+6. Controlla l'anteprima, digita **`PUBBLICA IN r/NomeCommunity`**, conferma il singolo invio e premi **PUBBLICA QUESTO POST**.
+7. Il backend invia **una sola richiesta** Reddit `POST /api/submit` via OAuth ufficiale e restituisce il link solo se Reddit conferma. Per risposte ambigue NON tenta un reinvio automatico: controlla prima i tuoi post su Reddit.
 
-### Reddit publishing after manual approval
+Non c'è invio in massa, crossposting automatico, programmazione non presidiata, DM automatici, scraping o aggiramento dei rate limit. Una settimana di post va decisa da te, subreddit per subreddit.
 
-The authorized Reddit integration supports **one text/self post at a time**, with the following workflow:
+## Limiti e controlli
 
-1. Choose a subreddit and review its rules, including restrictions on self-promotion.
-2. Select a draft or write a post manually.
-3. **Personally review** the exact subreddit, title, and body, and **edit them if needed**.
-4. Confirm the applicable community rules and required disclosures.
-5. Generate a final preview; the approved draft expires after 10 minutes.
-6. Enter the specific confirmation phrase and explicitly authorize this **single** submission.
-7. Only then does Social Studio call Reddit's official `POST /api/submit` endpoint.
+- Le API Reddit, le credenziali e la pubblicazione potrebbero non essere disponibili finché Reddit non concede l'autorizzazione al tuo caso d'uso. Il tool **non** richiede ai mod di un subreddit l'autorizzazione a postare per tuo conto e non può garantirla.
+- Il confronto valuta l'engagement visibile in un campione di top post, **non** le wishlist generate. Un post con molti upvote non è automaticamente marketing efficace.
+- Lo User-Agent deve identificare realmente la app e l'account. Non usare app di terze parti o credenziali rubate per aggirare l'approvazione Reddit.
+- Cambiare il testo dopo la revisione invalida l'anteprima e obbliga a una nuova conferma.
+- Il server locale ascolta solo su `127.0.0.1` con token anti-CSRF. Le impronte dei post pubblicati sono salvate localmente in `social_published.json` per ridurre i reinvii identici anche dopo un riavvio (non contiene credenziali). Non esporre mai il servizio su Internet.
+- Le richieste ai servizi Reddit vanno **su Internet**, mentre la generazione Qwen resta locale. Non condividere `reddit_config.json` o log con credenziali.
+- Progettato come software sperimentale: OAuth, query benchmark e invio sono stati testati con risposte Reddit **simulate**, non pubblicando su un account reale.
 
-The application records locally the fingerprints of successfully submitted posts to reduce accidental duplicates. If Reddit's response is ambiguous, it does not automatically retry. The user must inspect Reddit before attempting another submission.
+Fonti ufficiali: https://support.reddithelp.com/hc/en-us/articles/14945211791892-Developer-Platform-Accessing-Reddit-Data ; https://support.reddithelp.com/hc/en-us/articles/360043504051-Spam ; https://www.reddit.com/dev/api/ ; https://redditinc.com/policies/data-api-terms .
 
-**No mass posting, scheduled/unattended publication, automated comments, votes, unsolicited DMs, account farming, or attempts to circumvent subreddit restrictions or API rate limits.**
 
-Reddit text-post submission is the only directly integrated publishing flow in this version. TikTok, Instagram, YouTube Shorts, X, and Bluesky are available for **draft planning**, not automated posting. Native Reddit video/image uploads are not implemented.
+## 3.0 — Video → Fotogrammi → Post
 
-## Requirements
+- Nuova scheda **Video → Post**: seleziona fino a due file gameplay MP4, WebM o MOV (se il browser riesce a decodificarli). I video non vengono inviati integralmente a Social Studio, Reddit, o Ollama: il browser legge il file localmente e campiona un fotogramma circa ogni 4/7/10 secondi.
+- Il tool mostra una **galleria di fotogrammi con timestamp** e preseleziona automaticamente quattro candidati in base a un semplice punteggio visivo. **Non è una rilevazione sicura delle anomalie**: verificare e selezionare i frame a mano.
+- Seleziona fino a 4 frame e premi **Usa i fotogrammi per generare il post**; nella scheda Crea contenuti premi **Genera 3 post e piano**. Il modello Qwen 3.5 9B vision riceverà solo quei 4 JPEG, con un elenco dei timestamp.
+- Puoi scaricare ogni frame JPG o i fotogrammi selezionati. Il tool non monta clip video, non carica video nativi su Reddit e non pubblica video via API; l'upload del video finale va eseguito manualmente nel browser Reddit.
+- È possibile mantenere il confronto e il flusso di approvazione manuale di Social Studio 2.0. La generazione e l'analisi visuale dipendono da Ollama.
 
-- Windows with **Python 3** available from the command line (the project uses the Python standard library; no `pip install` is required).
-- Optional, for draft generation and translation: [Ollama](https://ollama.com/) with the model `qwen3.5:9b`.
-- Optional, for the Reddit integration: **Reddit-approved Data API access** for the intended use, an OAuth app with a Client ID/Secret, and the owner's explicit account authorization.
+**Importante:** Se un subreddit richiede trasparenza sull'uso di IA generativa nella promozione, dichiarare che il testo del post è stato assistito da Qwen (anche se lo sviluppatore lo ha revisionato). Non dichiarare erroneamente che il gioco non usa IA.
 
-The app runs locally on `127.0.0.1:8766` by default. Ollama runs locally on `127.0.0.1:11434`.
+### Aggiornare un repository GitHub già esistente
 
-## Getting started
+Sostituisci i file aggiornati nella cartella locale di `social-studio`, poi:
 
-1. Clone or download this repository.
-2. To use the optional local drafting features, install [Ollama](https://ollama.com/) and download the model:
-
-   ```bash
-   ollama pull qwen3.5:9b
-   ```
-
-3. On Windows, run `AVVIA_SOCIAL_STUDIO.bat`. Alternatively, from the project directory run:
-
-   ```bash
-   python social_studio_server.py
-   ```
-
-4. Open **http://127.0.0.1:8766/** in a browser.
-5. Use **Create content** to prepare drafts and a plan, or **Compare & Publish** to configure the authorized Reddit connection.
-
-Content drafting and manual posting do **not** require Reddit API credentials. Reddit research and API-based submission do.
-
-## Connecting Reddit (authorized use only)
-
-If Reddit has approved your intended API usage:
-
-1. Create/configure the approved OAuth app as required by Reddit.
-2. Use the exact redirect URI: `http://127.0.0.1:8766/reddit/callback` (or the matching port if you change `SOCIAL_STUDIO_PORT`).
-3. In **Compare & Publish**, enter the Reddit Client ID, Client Secret, and an identifiable User-Agent.
-4. Confirm that Reddit has approved the intended API use, connect your own Reddit account via OAuth, and grant `identity`, `read`, and `submit` permissions.
-5. Review each post and authorize its submission individually.
-
-The application uses an OAuth **temporary** session, so you may need to reconnect when it expires. Connecting an account never starts a background posting process.
-
-Without approved API access, you can still create and edit drafts and open the Reddit post composer to publish **manually**.
-
-## Privacy and local data
-
-- Draft generation uses a locally hosted Ollama model; this project does not send prompts to a hosted AI provider.
-- Using Reddit's API necessarily sends authorized requests and submitted content to Reddit.
-- Client ID, Client Secret, and User-Agent are stored locally in `reddit_config.json`. **Do not commit or share this file.**
-- OAuth access tokens and prepared drafts are kept in process memory, not intentionally persisted across restarts.
-- The tool keeps a local `social_published.json` record of successful submissions to help prevent duplicates.
-- Drafts, preferences, and manually entered performance metrics may be stored in the browser's `localStorage`.
-- The local server binds to `127.0.0.1`; do not expose it publicly or deploy it as-is on a shared server.
-
-Recommended `.gitignore` entries:
-
-```gitignore
-reddit_config.json
-social_published.json
-.env
-.env.*
-!.env.example
-__pycache__/
-*.pyc
-*.log
-.venv/
-venv/
+```bash
+git add .
+git commit -m "feat: add local video frame extraction for social posts"
+git push origin main
 ```
-
-Never upload API secrets, OAuth tokens, local browser exports containing private data, or screenshots showing credentials.
-
-## Responsible use
-
-- Follow [Reddit's API requirements](https://support.reddithelp.com/hc/en-us/articles/14945211791892-Developer-Platform-Accessing-Reddit-Data), [Data API Terms](https://redditinc.com/policies/data-api-terms), and [spam policy](https://support.reddithelp.com/hc/en-us/articles/360043504051-Spam).
-- Obtain the appropriate permission for promotional or other commercial usage **before** using the Data API.
-- Respect individual community rules, moderator guidance, posting limits, and any requirements to disclose promotional affiliations or AI-assisted material.
-- A user must evaluate each post in context and approve it; **no automated approval** is provided.
-- This is not an official Reddit product and is not affiliated with, endorsed by, or approved by Reddit.
-
-## Implementation and current limitations
-
-| Component | Implementation |
-| --- | --- |
-| Local backend | Python 3 standard library (`social_studio_server.py`) |
-| Web interface | HTML and vanilla JavaScript (`index.html`, `client.js`, `reddit_workflow.js`) |
-| Reddit integration | OAuth 2.0 and official Reddit Data API (`reddit_integration.py`) |
-| Optional draft assistant | Ollama / Qwen 3.5 9B, hosted on the user's machine |
-| Local persistence | Browser `localStorage` and small local JSON files |
-
-This is an experimental project. API connectivity and submission logic have been exercised with **simulated Reddit responses**; that is not proof of working production access or Reddit approval. The application does not guarantee engagement, wishlist growth, subreddit acceptance, or publication success.
-
-## Project links
-
-- Repository: https://github.com/Chryi123/social-studio
-- Reddit API reference: https://www.reddit.com/dev/api/
