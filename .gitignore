@@ -1,0 +1,13 @@
+reddit_config.json
+social_published.json
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+*.log
+*.tmp
+.venv/
+venv/
+.idea/
+.vscode/

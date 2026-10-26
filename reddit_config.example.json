@@ -1,0 +1,6 @@
+{
+  "client_id": "YOUR_APPROVED_REDDIT_APP_CLIENT_ID",
+  "client_secret": "YOUR_REDDIT_APP_CLIENT_SECRET",
+  "user_agent": "windows:SocialStudio:v2.0 (by /u/YOUR_ACCOUNT)",
+  "api_access_approved": false
+}
